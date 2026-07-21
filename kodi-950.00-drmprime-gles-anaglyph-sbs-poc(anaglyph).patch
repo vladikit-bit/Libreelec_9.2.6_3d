@@ -1,0 +1,42 @@
+diff --git a/system/shaders/GLES/2.0/gles_shader_rgba_oes.frag b/system/shaders/GLES/2.0/gles_shader_rgba_oes.frag
+index 9464dd7ef4..65ca2b33a0 100644
+--- a/system/shaders/GLES/2.0/gles_shader_rgba_oes.frag
++++ b/system/shaders/GLES/2.0/gles_shader_rgba_oes.frag
+@@ -31,7 +31,15 @@ void main ()
+ {
+   vec4 rgb;
+ 
+-  rgb = texture2D(m_samp0, m_cord0.xy);
++  /*
++   * Rockchip DRMPRIME/GLES proof-of-concept:
++   * treat every external video texture as half-SBS and mix it to red/cyan
++   * anaglyph. This is intentionally hardcoded for the first hardware test.
++   */
++  vec2 uv = m_cord0.xy;
++  vec4 leftEye = texture2D(m_samp0, vec2(uv.x * 0.5, uv.y));
++  vec4 rightEye = texture2D(m_samp0, vec2(0.5 + uv.x * 0.5, uv.y));
++  rgb = vec4(leftEye.r, rightEye.g, rightEye.b, max(leftEye.a, rightEye.a));
+   rgb *= m_contrast;
+   rgb += m_brightness;
+ 
+diff --git a/xbmc/rendering/gles/RenderSystemGLES.cpp b/xbmc/rendering/gles/RenderSystemGLES.cpp
+index 55f293e02a..5d630c05e5 100644
+--- a/xbmc/rendering/gles/RenderSystemGLES.cpp
++++ b/xbmc/rendering/gles/RenderSystemGLES.cpp
+@@ -645,7 +645,15 @@ GLint CRenderSystemGLES::GUIShaderGetBrightness()
+ 
+ bool CRenderSystemGLES::SupportsStereo(RENDER_STEREO_MODE mode) const
+ {
+-  return CRenderSystemBase::SupportsStereo(mode);
++  switch (mode)
++  {
++    case RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN:
++    case RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA:
++    case RENDER_STEREO_MODE_ANAGLYPH_YELLOW_BLUE:
++      return true;
++    default:
++      return CRenderSystemBase::SupportsStereo(mode);
++  }
+ }
+ 
+ GLint CRenderSystemGLES::GUIShaderGetModel()

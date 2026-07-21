@@ -1,0 +1,53 @@
+diff --git a/system/shaders/GLES/2.0/gles_shader_rgba_oes.frag b/system/shaders/GLES/2.0/gles_shader_rgba_oes.frag
+index 9464dd7ef4..d1a8f9b2c3 100644
+--- a/system/shaders/GLES/2.0/gles_shader_rgba_oes.frag
++++ b/system/shaders/GLES/2.0/gles_shader_rgba_oes.frag
+@@ -31,10 +31,23 @@ void main ()
+ {
+   vec4 rgb;
+ 
+-  rgb = texture2D(m_samp0, m_cord0.xy);
+-  rgb *= m_contrast;
+-  rgb += m_brightness;
+-
+-  gl_FragColor = rgb;
++  /*
++   * Rockchip DRMPRIME/GLES Final Hardened PoC v2.1
++   * Hardcoded Half-SBS -> Pure Linear Dubois
++   */
++  vec2 uv = m_cord0.xy;
++  vec3 l = texture2D(m_samp0, vec2(uv.x * 0.5, uv.y)).rgb;
++  vec3 r = texture2D(m_samp0, vec2(0.5 + uv.x * 0.5, uv.y)).rgb;
++  
++  float outR = dot(l, vec3(0.456, 0.500, 0.176)) + dot(r, vec3(-0.043, -0.088, -0.002));
++  float outG = dot(l, vec3(-0.040, -0.038, -0.016)) + dot(r, vec3(0.378, 0.734, -0.018));
++  float outB = dot(l, vec3(-0.015, -0.021, -0.005)) + dot(r, vec3(-0.072, -0.113, 1.226));
++  
++  vec3 color = vec3(outR, outG, outB);
++  
++  color *= m_contrast;
++  color += m_brightness;
++  
++  gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+ }
+diff --git a/xbmc/rendering/gles/RenderSystemGLES.cpp b/xbmc/rendering/gles/RenderSystemGLES.cpp
+index 55f293e02a..5d630c05e5 100644
+--- a/xbmc/rendering/gles/RenderSystemGLES.cpp
++++ b/xbmc/rendering/gles/RenderSystemGLES.cpp
+@@ -645,7 +645,15 @@ GLint CRenderSystemGLES::GUIShaderGetBrightness()
+ 
+ bool CRenderSystemGLES::SupportsStereo(RENDER_STEREO_MODE mode) const
+ {
+-  return CRenderSystemBase::SupportsStereo(mode);
++  switch (mode)
++  {
++    case RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN:
++    case RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA:
++    case RENDER_STEREO_MODE_ANAGLYPH_YELLOW_BLUE:
++      return true;
++    default:
++      return CRenderSystemBase::SupportsStereo(mode);
++  }
+ }
+ 
+ GLint CRenderSystemGLES::GUIShaderGetModel()
